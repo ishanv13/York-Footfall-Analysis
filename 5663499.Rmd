@@ -1,0 +1,304 @@
+---
+title: 'Business Statistics Mid-Term Assessment IB94X0 2024-2025 #1'
+author: 'Ishan Verma - 5663499'
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+---
+
+**Declaration**
+
+This is to certify that the work I am submitting is my own. All external references and sources if used, are clearly acknowledged and identified within the contents. I am aware of the University of Warwick regulation concerning plagiarism and collusion. 
+
+No substantial part(s) of the work submitted  here has been submitted by  me  in any other assessments for accredited courses of study, and I acknowledge that if this has been done an appropriate reduction in the mark will be made.
+
+AI might have been used in the preparation of this work. It was used in the development of some parts of the code: It was used to provide example uses of functions or approaches to elements of the challenges, which were then interpreted by me and modified to be applicable to this data/report.
+
+---
+# Section 1
+
+
+### Importing the Libraries:
+
+```{r, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(dplyr)
+library(gridExtra)
+library(kableExtra)
+```
+
+This report helps the promoter to decide what is the best location to place the stalls at, by performing these specific analyses.
+
+
+1. Provide a summary table that shows the following for each location where footfall was measured:
+    - The date of the first and last day when footfall was measured at this location
+    - The mean daily footfall
+    - The standard deviation of the daily footfall
+    - The highest daily footfall
+    - The lowest daily footfall
+2. Plotting the distribution of footfall across all days and locations where footfall is measured in 2019.
+3. Performing a t-test to compare the footfall on Coney Street to Stonegate in 2019.
+4. Performing an additional t-test to compare the footfall on Coney Street to Stonegate only on weekends of 2019 (i.e.
+   Saturdays/Sundays).
+5. What would be the advise to the promoter about whether they should place their stall on Coney Street or
+   Stonegate to maximise the number of passers by:
+    - if they were doing so every day of the week
+    - if they were doing so only at weekends
+
+
+
+### Data Dictionary
+
+This data is provided by a promoter in York who is deciding what is the best location to place their stall
+so that the most people walk by it. The variables are described in the table below
+
+Variable | Description
+-------------|-------------
+Date | Date on which the Footfall data was recorded
+SiteName | Site(City) at which the Data was collected
+LocationName | Location where the data is collected and the stall is to be placed
+WeekDay | The day of the week when the data was recorded
+TotalCount | Total footfall recorded 
+Recording_ID | Recording ID of the data recorded
+
+
+
+### Loading and Data Quality Checking:
+
+```{r}
+#Loading the data
+footfall_data <- read_csv("York_Footfall_data.csv")
+
+#Let's first check the data type of each column
+spec(footfall_data)
+
+#As the Date column wasn't in the right format so we can change it to the DATE format
+footfall_data$Date <- as.Date(footfall_data$Date, Format= "%Y-%m-%d")
+
+#Now we can calculate the number of 'NA' values in our dataset
+sum(is.na(footfall_data))
+
+#Let's check in which all column these NA values are present
+summarise_all( footfall_data , ~ sum (is.na(.x)))
+
+count(footfall_data, LocationName)
+
+
+```
+
+As we can see the *Recoding_ID* has 100 `NA` values and *TotalCount* has 10 `NA` values. As we don't have to do any work or calculations using the *Recoding_ID* so we'll leave it as it is. For the *TotalCount* Column, while summarizing we can use `na.rm = TRUE` to ignore all the `NA` values.
+
+
+
+
+
+### 1. Summarising the Table:
+
+```{r}
+#Summary table that shows the following for each location where footfall was measured
+footfall_summarise <- footfall_data %>% 
+  group_by(Location=LocationName) %>%
+            summarise(FirstDay=min(Date),
+                      LastDay=max(Date),
+                      DailyAverage=mean(TotalCount,na.rm=TRUE),
+                      StandardDeviation= sd(TotalCount,na.rm=TRUE),
+                      Maximum=max(TotalCount,na.rm=TRUE),
+                      Minimum=min( TotalCount,na.rm=TRUE))
+
+footfall_summarise
+
+```
+
+We have summarized the original table based on the *Location_Name* which gives us the First day and Last day for which the Footfall was recorded at that particular location. We also got the mean number of daily Footfalls recorded for each location and the standard deviation as well as the highest and lowest recorded Footfall for every location.
+
+
+
+
+### Filtering the data for the year 2019:
+
+As now we only have to deal with the data from the year 2019, we can create a seperate table using the `filter` and `grepl` function to filter out all the data entries from the year 2019.
+
+```{r}
+#Creating a seperate table for the 2019 data
+Pre_Covid <- filter(footfall_data, grepl("2019", Date))
+
+#Checking the NA values
+summarise_all( Pre_Covid , ~ sum (is.na(.x)))
+```
+
+As the NA values don't effect our calculations so we'll leave it as it is.
+
+
+
+### 2. Plotting Footfall distribution across all days for each location:
+
+As we want to know which locations have more and wider range of Footfall data, we can get that by knowing the extreme values as well as the spread of the data for which *Box Plot* will be the perfect fit. Hence, we have plotted the *Box Plot* as shown below.
+
+```{r}
+#Plotting a Box plot to see the distribution of data of the data
+ggplot(Pre_Covid, aes(x = LocationName, y = TotalCount, fill=LocationName)) + geom_boxplot() + 
+  labs(x = "Location Name", y = "Total Footfall Count", caption = "Figure 1. Box plot for all locations based on footfall count.") + theme(legend.position="none")
+```
+
+The boxplot shows that the spread of data values at *Micklegate* is way less than that of other location which means that *Micklegate* recorded very less Footfall over the year than the other three location in 2019. 
+
+Let's plot a Histogram to get more information of the data.
+
+```{r}
+#Plotting a Histogram to check the concentration of data
+ggplot(Pre_Covid) + geom_histogram(aes(TotalCount, fill= LocationName), binwidth = 1100, position= "identity", alpha = 0.5) + facet_grid(LocationName~.) + labs(x = "FootFall Counts", y = "Count", color= "Location Name", caption = "Figure 2. Histograms of Footfall Count for each Location.")
+```
+
+The Histogram shows that *Micklegate* recorded higher Footfall in the range of 5000-15000 and *Coney Street* in the range of 15000-25000 whereas the *Parliament Street* and *Stonegate* has more evenly distributed Footfall data.
+
+
+```{r}
+#Plotting a smooth line to check the skewness and similarities in the data
+ggplot(data = Pre_Covid) +
+ geom_jitter(mapping = aes(x = Date, y = TotalCount, color = LocationName),alpha= 0.3,show.legend = TRUE) + #geom_smooth( mapping = aes(Date,TotalCount, colour = LocationName)) + 
+  facet_grid(LocationName~.) + labs(x = "Dates", y = "Footfall Count", color= "Location Name", caption = "Figure 3. The Skewness of data recorded for different locations based on Dates.") + theme_minimal()
+  
+```
+
+This graph tells alot about the Footfall data and it's distribution over the year. *Micklegate* had a lower footfall constantly over the year whereas *Parliament Street* footfall showed a more constant increased footfall over the year as the plot is slightly more scattered compared to the other locations. The *Coney Street* and *Stonegate* had quite similar spread of data over the year with the footfall slightly increasing by the end of the year. We can see some extreme values for *Coney Street*, *Parliament Street* and *Stonegate* at constant intervals over the year which might represent increased footfall on Weekends compared to week days.
+
+
+
+
+### 3. Performing T-test for Coney street and Stonegate:
+
+To perform the *T-test* on Coney Street and Stonegate, we need to first get the data for the two locations seperately which we can do using the `pull()` function which will create a separate vector just for the values we need to perform our *T-test* on.
+
+```{r}
+#Seperating the Coney Street values from the table
+coney_footfall <- Pre_Covid %>% 
+  filter(LocationName == "Coney Street") %>% 
+  select(TotalCount) %>% 
+  pull()
+
+#Seperating the Stonegate values from the table
+stonegate_footfall <- Pre_Covid %>% 
+  filter(LocationName == "Stonegate") %>% 
+  select(TotalCount) %>% 
+  pull()
+
+#Perform a t-test to compare the footfall on Coney Street to Stonegate. 
+t.test(coney_footfall, stonegate_footfall)
+
+```
+
+From the *T-test* we can see that the t-Value is 3.3611 and the P-Value is 0.0008186 which is less that 0.05 [ t(699.18) = 3.36, (p<0.001) ] which means that the NULL Hypothesis is rejected and there is a significant difference between the mean values of *Coney Street* (20817) and *Stonegate* (19204). 
+
+
+
+### 4. Performing T-test for Coney street and Stonegate on Weekends:
+```{r}
+
+# Filter weekend data (Saturdays and Sundays)
+weekend_data <- Pre_Covid %>% 
+  filter(WeekDay %in% c("Saturday", "Sunday"))
+
+# Extract footfall data for Coney Street and Stonegate on weekends
+coney_footfall_weekend <- weekend_data %>% 
+  filter(LocationName == "Coney Street") %>% 
+  select(TotalCount) %>% 
+  pull()
+
+stonegate_footfall_weekend <- weekend_data %>% 
+  filter(LocationName == "Stonegate") %>% 
+  select(TotalCount) %>% 
+  pull()
+
+# Perform the t-test for weekend data
+t.test(coney_footfall_weekend, stonegate_footfall_weekend)
+```
+
+From the *T-test* we can see that the t-Value is -0.29072 and the P-Value is 0.7716 which is more that 0.05 [ t(203.88) = -0.29, (p > 0.05) ] which means that the NULL Hypothesis might be True and there is not a significant difference between the mean values of *Coney Street* (25863) and *Stonegate* (26167) on the weekend.
+
+
+
+### 5. Which location should the promoter choose to place their stall:
+
+Based on the t-test results, here is the advice for the promoter regarding placing their stall on Coney Street or Stonegate:
+
+1. For the Week Days: Since the t-test comparing daily footfall in 2019 between Coney Street and Stonegate showed a statistically significant difference (p-value = 0.00082), with Coney Street having slightly higher footfall (and mean) than Stonegate. Hence they should **Place the stall on Coney Street**. The higher footfall on Stonegate means more potential passersby and visibility for the stall when considering all days of the week.
+
+2. For the Weekends: Since the t-test comparing weekend footfall (Saturdays and Sundays) between Coney Street and Stonegate showed no statistically significant difference (p-value = 0.7716). Hence **Either location would be suitable** since there is no significant difference in foot traffic (and mean) between Coney Street and Stonegate during weekends. The promoter could choose based on other factors like location preferences, rent costs, or access to target audiences.
+
+In summary, for a stall open every day, Coney Street is the better choice. For a stall open only on weekends, both locations would be equally good from a footfall perspective.
+
+
+
+# Section 2
+
+
+This report presents the results of the analyses conducted to determine the optimal stall location for the promoter in York. The analysis is based on footfall data collected from various locations. Initial data cleaning and quality checks revealed missing values in the `TotalCount` and `Recording_ID` field. After handling these missing values, the final analysis was conducted using the data.
+
+We begin with a summary of the footfall data at each location (Table 1).
+
+```{r, echo=FALSE}
+# Display the summary table for footfall data
+footfall_summarise %>%
+  kbl(caption = "Table 1. Summary of footfall data by location") %>%
+  kable_styling()
+```
+
+The key thing to notice here is that for *Chruch Street* and *Parliament Street at M&S*, there is no data for the year 2019 as from here on we'll be only dealing with the data from the year 2019.
+
+The distribution of footfall across all locations is shown in Figure 1, which includes a smooth plot representing the trend over time.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Smooth plot of footfall data over time for each location
+ggplot(data = Pre_Covid) +
+  geom_smooth(mapping = aes(x = Date, y = TotalCount, color = LocationName), show.legend = TRUE) + 
+  labs(
+    x = "Dates",
+    y = "Footfall Count",
+    color = "Location Name",
+    caption = "Figure 1. Footfall Trends Over Time by Location"
+  ) +
+  theme_minimal()
+```
+
+The smooth plot in Figure 1 helps visualize the trend of footfall counts over time at each location, allowing the promoter to identify periods of high and low foot traffic based on the locations. This graph shows that *Micklegate* had a lower footfall constantly over the year whereas *Parliament Street* footfall showed an increase in footfall during the middle of the year but a little downward trend was noticed at the starting and ending of the year. The *Coney Street* and *Stonegate* had quite similar spread of footfall over the year with the footfall slightly increasing by the end of the year.
+
+
+
+```{r, echo= FALSE}
+#Plotting a smooth line to check the spreqad and similarities in the data
+ggplot(data = Pre_Covid) +
+ geom_jitter(mapping = aes(x = Date, y = TotalCount, color = LocationName),alpha= 0.8,show.legend = TRUE) + #geom_smooth( mapping = aes(Date,TotalCount, colour = LocationName)) + 
+  facet_grid(LocationName~.) + labs(x = "Dates", y = "Footfall Count", color= "Location Name", caption = "Figure 2. The Skewness of data recorded for different locations based on Dates.") + theme_minimal()
+```
+
+The Figure 2 gives us the details about the busy days as well as the quite days for all the three locations. The *Micklegate* consistently recorded low footfall count days while most variation in footfall was recorded at the *Parliament Street*. From this figure we can also see that the distribution of *Coney Street* and *Stonegate* are quite similar with sudden increases at equal intervals during the whole year, which might be representing the increased footfall on weekends.
+
+This table (Table 2) summarizes the footfall distribution for the year 2019.
+```{r, echo=FALSE}
+precovid_footfall_summarise <- Pre_Covid %>% 
+  group_by(Location=LocationName) %>%
+            summarise(AverageDailyFootfall=mean(TotalCount,na.rm=TRUE),
+                      StandardDeviation= sd(TotalCount,na.rm=TRUE),
+                      Maximum=max(TotalCount,na.rm=TRUE),
+                      Minimum=min( TotalCount,na.rm=TRUE))
+
+precovid_footfall_summarise %>%
+  kbl(caption = "Table 2. Summary of footfall data for the year 2019") %>%
+  kable_styling()
+```
+
+**t-test**
+
+A t-test analysis compared the footfall between *Coney Street* and *Stonegate*, resulting in a significant difference, `t(699.18) = 3.36, (p<0.001)` when considering daily footfall across all days of the week which showed the mean footfall at *Coney Street* being 20817 and at *Stonegate* being 19204 over the week days. Additionally, the comparison on weekends alone (Saturday and Sunday) revealed no statistically significant difference `t(203.88) = -0.29, (p > 0.05)` as the mean at *Coney Street* (25863) and *Stonegate* (26167) weren't significantly different over the weekends.
+
+**Conclusion**
+
+These results suggest that while **Coney Street** may be a more favorable location for daily operations, whereas both locations would perform similarly on weekends.
+
+
+We recommend further analysis and consideration of other factors like rental costs and target audience when choosing the final location for the stall. A more detailed summary of spending or customer behavior across different time periods could offer additional insights.
+
+
+
